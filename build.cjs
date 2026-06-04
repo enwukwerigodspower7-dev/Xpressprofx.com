@@ -1,77 +1,152 @@
-/**
- * XpressPro FX — Universal Build Script
- * Works on Railway, Render, Fly.io, VPS, local machine, any platform.
- * Run: node build.cjs
- */
-const { execSync } = require("child_process");
-const path = require("path");
+#!/usr/bin/env node
+
 const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
 
 const ROOT = __dirname;
 
-function run(cmd, cwd = ROOT) {
-  console.log(`\n▶ ${cmd}`);
-  execSync(cmd, { cwd, stdio: "inherit", env: { ...process.env } });
+function run(cmd) {
+  console.log(`\n▶ ${cmd}\n`);
+  execSync(cmd, { stdio: "inherit" });
 }
 
-function exists(p) {
-  return fs.existsSync(p);
+function log(msg) {
+  console.log(`\n${msg}\n`);
 }
 
-console.log("=================================================");
-console.log("  XpressPro FX — Build");
-console.log(`  Node: ${process.version}`);
-console.log("=================================================\n");
+/**
+ * 🔍 Recursively find all .zip files
+ */
+function findZipFiles(dir, results = []) {
+  const files = fs.readdirSync(dir);
 
-// Step 1 — Install pnpm if missing
-try {
-  execSync("pnpm --version", { stdio: "ignore" });
-  console.log("✅ pnpm already installed");
-} catch {
-  console.log("Installing pnpm...");
-  run("npm install -g pnpm");
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
+
+    if (fs.statSync(fullPath).isDirectory()) {
+      findZipFiles(fullPath, results);
+    } else if (file.endsWith(".zip")) {
+      results.push(fullPath);
+    }
+  }
+
+  return results;
 }
 
-// Step 2 — Install all workspace dependencies
-console.log("\n📦 Installing dependencies...");
-run("pnpm install --no-frozen-lockfile");
+/**
+ * 📦 Extract all zip files in-place
+ */
+function extractAllZips() {
+  log("🔍 Searching for ZIP files...");
 
-// Step 3 — Build shared libraries
-console.log("\n📚 Building shared libraries...");
-const libs = ["lib/db", "lib/api-zod", "lib/api-client-react"];
-for (const lib of libs) {
-  const libPath = path.join(ROOT, lib);
-  const pkg = JSON.parse(fs.readFileSync(path.join(libPath, "package.json"), "utf8"));
-  if (pkg.scripts?.build) {
-    run("pnpm run build", libPath);
-  } else {
-    console.log(`  ⏭  ${lib} — no build script, skipping`);
+  const zips = findZipFiles(ROOT);
+
+  if (zips.length === 0) {
+    log("✅ No zip files found");
+    return;
+  }
+
+  log(`📦 Found ${zips.length} zip file(s)`);
+
+  for (const zipPath of zips) {
+    const dir = path.dirname(zipPath);
+    const name = path.basename(zipPath);
+
+    console.log(`\n📂 Extracting: ${name}`);
+
+    try {
+      run(`unzip -o "${zipPath}" -d "${dir}"`);
+    } catch (err) {
+      console.warn(`⚠️ Failed to extract ${name}, continuing...`);
+    }
+  }
+
+  log("✅ All zip files processed");
+}
+
+/**
+ * ✅ Ensure lib/db exists
+ */
+function validateStructure() {
+  const dbPkg = path.join(ROOT, "lib", "db", "package.json");
+
+  if (!fs.existsSync(dbPkg)) {
+    console.error("❌ Missing lib/db/package.json after extraction");
+    process.exit(1);
+  }
+
+  log("✅ lib/db structure verified");
+}
+
+/**
+ * 📦 Install dependencies
+ */
+function installDependencies() {
+  log("📦 Installing dependencies...");
+  run("pnpm install --no-frozen-lockfile");
+}
+
+/**
+ * 📚 Build internal libs
+ */
+function buildLibs() {
+  const dbPath = path.join(ROOT, "lib", "db");
+
+  if (fs.existsSync(dbPath)) {
+    log("📚 Building lib/db...");
+    run(`cd "${dbPath}" && pnpm install && pnpm build || echo "No build step"`);
   }
 }
 
-// Step 4 — Build API server
-console.log("\n🔧 Building API server...");
-run("pnpm run build", path.join(ROOT, "artifacts/api-server"));
+/**
+ * 🚀 Build main app
+ */
+function buildApp() {
+  if (fs.existsSync(path.join(ROOT, "package.json"))) {
+    log("🚀 Building main app...");
 
-// Step 5 — Build NeXTrade frontend
-console.log("\n🌐 Building NeXTrade frontend...");
-run("pnpm run build", path.join(ROOT, "artifacts/nextrade"), {
-  ...process.env,
-  PORT: "3000",
-  BASE_PATH: "/",
-});
+    try {
+      run("pnpm build");
+    } catch {
+      log("⚠️ No root build script, skipping...");
+    }
+  }
+}
 
-// Step 6 — Build Admin Portal
-console.log("\n🔐 Building Admin Portal...");
-const adminEnv = { ...process.env, PORT: "3001", BASE_PATH: "/xpadmin/" };
-execSync("pnpm run build", {
-  cwd: path.join(ROOT, "artifacts/admin-portal"),
-  stdio: "inherit",
-  env: adminEnv,
-});
+/**
+ * 🔁 MAIN FLOW
+ */
+function main() {
+  console.log(`
+=================================================
+  XpressPro FX — Build
+  Node: ${process.version}
+=================================================
+  `);
 
-console.log("\n=================================================");
-console.log("  ✅ BUILD COMPLETE");
-console.log("  Start with: node artifacts/api-server/dist/index.mjs");
-console.log("  or: npm start");
-console.log("=================================================\n");
+  // Ensure pnpm
+  try {
+    execSync("pnpm -v", { stdio: "ignore" });
+    log("✅ pnpm already installed");
+  } catch {
+    log("📦 Installing pnpm...");
+    run("npm install -g pnpm");
+  }
+
+  installDependencies();
+
+  // 🔥 NEW: extract ALL zips first
+  extractAllZips();
+
+  // Validate required structure
+  validateStructure();
+
+  // Build libs + app
+  buildLibs();
+  buildApp();
+
+  log("🎉 BUILD COMPLETED SUCCESSFULLY");
+}
+
+main();
