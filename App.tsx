@@ -1,136 +1,170 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useState } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import { Shell } from "@/components/layout/Shell";
-import { PublicLayout } from "@/components/layout/PublicLayout";
-import { AuthProvider, RequireAuth, RequireAdmin, useAuth } from "@/lib/auth";
-
-import { AiAnalyst } from "@/pages/ai-analyst";
-import { SupportChatWidget } from "@/components/SupportChatWidget";
-import { Dashboard } from "@/pages/dashboard";
-import { Wallets } from "@/pages/wallets";
-import { Trades } from "@/pages/trades";
-import { P2PMarket } from "@/pages/p2p";
-import { Managers } from "@/pages/managers";
-import { Messages } from "@/pages/messages";
-import { Assets } from "@/pages/assets";
-import { Support } from "@/pages/support";
-import { Settings } from "@/pages/settings";
-import { Login } from "@/pages/login";
-import { Signup } from "@/pages/signup";
-import { VerifyOtp } from "@/pages/verify-otp";
-import { ConnectWallet } from "@/pages/connect-wallet";
-import { Kyc } from "@/pages/kyc";
-import { Deposits } from "@/pages/deposits";
-import { Withdrawals } from "@/pages/withdrawals";
-import { Referrals } from "@/pages/referrals";
-import { Banks } from "@/pages/banks";
-import { Cards } from "@/pages/cards";
-import { Promotions } from "@/pages/promotions";
-import { Billing } from "@/pages/billing";
-import { Admin } from "@/pages/admin";
-
-import { PublicHome } from "@/pages/public/home";
-import { PublicMarkets } from "@/pages/public/markets";
-import { PublicEducation } from "@/pages/public/education";
-import { PublicCalendar } from "@/pages/public/calendar";
-import { PublicAbout } from "@/pages/public/about";
-import { PublicContact } from "@/pages/public/contact";
-import { PublicLegal } from "@/pages/public/legal";
-import { PublicFaq } from "@/pages/public/faq";
-import { PublicInvestmentPlans } from "@/pages/public/investment-plans";
-import { CopyTrading } from "@/pages/copy-trading";
+import { LoginPage } from "@/pages/login";
+import { DashboardPage } from "@/pages/dashboard";
+import { UsersPage } from "@/pages/users";
+import { UserDetailPage } from "@/pages/user-detail";
+import { GasFeePage } from "@/pages/gas-fee";
+import { LiveChatPage } from "@/pages/live-chat";
+import { MailboxPage } from "@/pages/mailbox";
+import { BillingPage } from "@/pages/billing-admin";
+import { PlatformSettingsPage } from "@/pages/platform-settings";
+import { AssetsPage } from "@/pages/assets";
+import { TradesPage } from "@/pages/trades";
+import { P2PMerchantsPage } from "@/pages/p2p-merchants";
+import { AdminNotificationsPage } from "@/pages/admin-notifications";
+import {
+  DesktopSidebar,
+  MobileSidebar,
+  TopAppBar,
+  getActivePage,
+} from "@/components/sidebar";
+import { useGetCurrentUser } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
+    queries: { retry: 1, refetchOnWindowFocus: false },
   },
 });
 
-function ProtectedShell() {
+function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [location] = useLocation();
+  const active = getActivePage(location);
+
   return (
-    <RequireAuth>
-      <Shell>
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/wallets" component={Wallets} />
-          <Route path="/trades" component={Trades} />
-          <Route path="/p2p" component={P2PMarket} />
-          <Route path="/managers" component={Managers} />
-          <Route path="/messages" component={Messages} />
-          <Route path="/assets" component={Assets} />
-          <Route path="/support" component={Support} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/kyc" component={Kyc} />
-          <Route path="/deposits" component={Deposits} />
-          <Route path="/withdrawals" component={Withdrawals} />
-          <Route path="/referrals" component={Referrals} />
-          <Route path="/banks" component={Banks} />
-          <Route path="/cards" component={Cards} />
-          <Route path="/promotions" component={Promotions} />
-          <Route path="/billing" component={Billing} />
-          <Route path="/ai-analyst" component={AiAnalyst} />
-          <Route path="/copy-trading" component={CopyTrading} />
-          <Route path="/admin">
-            <RequireAdmin>
-              <Admin />
-            </RequireAdmin>
-          </Route>
-          <Route component={NotFound} />
-        </Switch>
-      </Shell>
-    </RequireAuth>
+    <div className="flex h-screen overflow-hidden bg-background">
+      <DesktopSidebar />
+      <MobileSidebar open={open} onOpenChange={setOpen} />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <TopAppBar title={active.label} onMenu={() => setOpen(true)} />
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
+    </div>
   );
 }
 
-/**
- * Renders the marketing landing page for visitors and the dashboard shell
- * for authenticated users — all behind the `/` route.
- */
-function RootRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return null;
-  if (isAuthenticated) return <ProtectedShell />;
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { data: user, isLoading, isError } = useGetCurrentUser();
+  const [, navigate] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  if (isError || !user) {
+    navigate("/login");
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function Protected({ children }: { children: React.ReactNode }) {
   return (
-    <PublicLayout>
-      <PublicHome />
-    </PublicLayout>
+    <AuthGuard>
+      <AdminLayout>{children}</AdminLayout>
+    </AuthGuard>
   );
 }
 
-function PublicPage({ children }: { children: React.ReactNode }) {
-  return <PublicLayout>{children}</PublicLayout>;
-}
-
-function AppRoutes() {
+function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/verify-otp" component={VerifyOtp} />
-      <Route path="/connect-wallet">
-        <RequireAuth>
-          <ConnectWallet />
-        </RequireAuth>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/">
+        {() => (
+          <Protected>
+            <DashboardPage />
+          </Protected>
+        )}
       </Route>
-
-      <Route path="/markets"><PublicPage><PublicMarkets /></PublicPage></Route>
-      <Route path="/education"><PublicPage><PublicEducation /></PublicPage></Route>
-      <Route path="/calendar"><PublicPage><PublicCalendar /></PublicPage></Route>
-      <Route path="/about"><PublicPage><PublicAbout /></PublicPage></Route>
-      <Route path="/contact"><PublicPage><PublicContact /></PublicPage></Route>
-      <Route path="/legal"><PublicPage><PublicLegal /></PublicPage></Route>
-      <Route path="/faq"><PublicPage><PublicFaq /></PublicPage></Route>
-      <Route path="/investment-plans"><PublicPage><PublicInvestmentPlans /></PublicPage></Route>
-
-      <Route path="/" component={RootRoute} />
-      <Route component={ProtectedShell} />
+      <Route path="/users">
+        {() => (
+          <Protected>
+            <UsersPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/users/:userId">
+        {(params) => (
+          <Protected>
+            <UserDetailPage userId={params.userId} />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/gas-fee">
+        {() => (
+          <Protected>
+            <GasFeePage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/live-chat">
+        {() => (
+          <Protected>
+            <LiveChatPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/mailbox">
+        {() => (
+          <Protected>
+            <MailboxPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/billing">
+        {() => (
+          <Protected>
+            <BillingPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/platform-settings">
+        {() => (
+          <Protected>
+            <PlatformSettingsPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/assets">
+        {() => (
+          <Protected>
+            <AssetsPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/trades">
+        {() => (
+          <Protected>
+            <TradesPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/p2p-merchants">
+        {() => (
+          <Protected>
+            <P2PMerchantsPage />
+          </Protected>
+        )}
+      </Route>
+      <Route path="/notifications">
+        {() => (
+          <Protected>
+            <AdminNotificationsPage />
+          </Protected>
+        )}
+      </Route>
+      <Route component={NotFound} />
     </Switch>
   );
 }
@@ -140,10 +174,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <AppRoutes />
-            <SupportChatWidget />
-          </AuthProvider>
+          <Router />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
