@@ -1,20 +1,25 @@
 {
-  "name": "xpressprofx",
-  "version": "1.0.0",
-  "description": "XpressPro FX - Forex Trading & Investment Broker Platform",
+  "name": "@workspace/db",
+  "version": "0.0.0",
   "private": true,
-  "engines": {
-    "node": ">=20.0.0"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "install:all": "npm install -g pnpm && pnpm install --no-frozen-lockfile",
-    "build": "node build.js",
-    "start": "node artifacts/api-server/dist/index.mjs",
-    "dev:api": "cd artifacts/api-server && PORT=8080 pnpm run dev",
-    "dev:web": "cd artifacts/nextrade && PORT=3000 BASE_PATH=/ pnpm run dev",
-    "dev:admin": "cd artifacts/admin-portal && PORT=3001 BASE_PATH=/xpadmin/ pnpm run dev"
+    "push": "drizzle-kit push --config ./drizzle.config.ts",
+    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:",
+    "drizzle-zod": "^0.8.3",
+    "pg": "^8.20.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "~5.9.2"
+    "@types/node": "catalog:",
+    "@types/pg": "^8.18.0",
+    "drizzle-kit": "^0.31.9"
   }
 }
