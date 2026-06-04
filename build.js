@@ -1,7 +1,7 @@
 /**
  * XpressPro FX — Universal Build Script
  * Works on Railway, Render, Fly.io, VPS, local machine, any platform.
- * Run: node build.js
+ * Run: node build.cjs
  */
 const { execSync } = require("child_process");
 const path = require("path");
