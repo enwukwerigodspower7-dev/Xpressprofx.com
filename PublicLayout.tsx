@@ -16,10 +16,9 @@ import { useAuth } from "@/lib/auth";
 const NAV = [
   { href: "/", label: "Home" },
   { href: "/markets", label: "Markets" },
-  { href: "/investment-plans", label: "Plans" },
   { href: "/education", label: "Education" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/about", label: "About" },
-  { href: "/faq", label: "FAQ" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -136,10 +135,8 @@ export function PublicLayout({ children }: { children: ReactNode }) {
           ]} />
           <FooterCol title="Company" links={[
             { href: "/about", label: "About us" },
-            { href: "/investment-plans", label: "Investment plans" },
             { href: "/education", label: "Education" },
             { href: "/calendar", label: "Economic calendar" },
-            { href: "/faq", label: "FAQ" },
             { href: "/contact", label: "Contact" },
           ]} />
           <FooterCol title="Legal" links={[
@@ -147,7 +144,6 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             { href: "/legal?tab=privacy", label: "Privacy policy" },
             { href: "/legal?tab=risk", label: "Risk disclosure" },
             { href: "/legal?tab=aml", label: "AML policy" },
-            { href: "/legal?tab=cookies", label: "Cookie policy" },
           ]} />
         </div>
         <div className="border-t border-border">

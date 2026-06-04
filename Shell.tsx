@@ -91,11 +91,9 @@ const navGroups: NavGroup[] = [
     label: "Trading",
     items: [
       { name: "Trades", href: "/trades", icon: LineChart },
-      { name: "Copy Trading", href: "/copy-trading", icon: Users },
       { name: "P2P Market", href: "/p2p", icon: ArrowLeftRight },
       { name: "Trade Manager", href: "/managers", icon: Users },
       { name: "Messages", href: "/messages", icon: MessageSquare },
-      { name: "AI Analyst", href: "/ai-analyst", icon: Sparkles },
     ],
   },
   {

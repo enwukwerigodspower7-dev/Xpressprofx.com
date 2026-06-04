@@ -4,29 +4,11 @@
  * Marketing entry-point that introduces XpressPro FX, showcases the live
  * market ticker, account tiers, supported asset classes, platform features,
  * and social proof. Designed to be the first impression for prospects.
- *
- * Sections (order):
- *  1. Live ticker tape
- *  2. Hero + live markets card
- *  3. Stats row
- *  4. Services grid (6 cards)
- *  5. Why traders choose us (6 cards)
- *  6. How It Works (4 steps)
- *  7. Account types / pricing (3 tiers)
- *  8. Platforms
- *  9. Testimonials
- * 10. CTA banner
- * 11. Contact info row
- * 12. Risk disclaimer
  */
 import { Link } from "wouter";
 import {
   TrendingUp, ShieldCheck, Zap, Globe2, BarChart3, Layers,
   Headphones, Award, Lock, Wallet, ArrowRight, Check,
-  ChartLine, Coins, Repeat2, Bot, BriefcaseBusiness, PiggyBank,
-  UserPlus, CreditCard, ListChecks, Rocket,
-  Mail, Phone, MapPin, MessageSquare,
-  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +20,7 @@ export function PublicHome() {
 
   return (
     <div>
-      {/* ── Live ticker ── */}
+      {/* Live ticker */}
       <div className="border-b border-border bg-card/40 overflow-hidden">
         <div className="flex gap-8 px-4 md:px-6 py-2 whitespace-nowrap animate-[scroll_40s_linear_infinite]">
           {[...ticker, ...ticker].map((t, i) => (
@@ -53,7 +35,7 @@ export function PublicHome() {
         </div>
       </div>
 
-      {/* ── Hero ── */}
+      {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-16 md:py-24 grid lg:grid-cols-2 gap-10 items-center">
@@ -78,13 +60,6 @@ export function PublicHome() {
               <Stat value="2.5M+" label="Active traders" />
               <Stat value="180+" label="Countries" />
               <Stat value="$4.2B" label="Daily volume" />
-            </div>
-            {/* Risk disclosure note in hero */}
-            <div className="mt-6 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                <AlertTriangle className="w-3 h-3 inline text-amber-400 mr-1" />
-                <strong className="text-amber-400">Risk Disclosure:</strong> Trading in financial instruments involves a high level of risk and may not be suitable for all investors. 74% of retail accounts lose money.
-              </p>
             </div>
           </div>
 
@@ -119,48 +94,7 @@ export function PublicHome() {
         </div>
       </section>
 
-      {/* ── Stats ── */}
-      <div className="border-y border-border bg-card/20">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-          {[
-            { value: "$2.4B+", label: "Assets Under Management" },
-            { value: "500K+", label: "Active Investors" },
-            { value: "150+", label: "Countries Supported" },
-            { value: "99.98%", label: "Platform Uptime" },
-          ].map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="text-2xl md:text-3xl font-bold text-primary">{s.value}</div>
-              <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Services grid ── */}
-      <Section title="Everything You Need to Invest" subtitle="From beginner portfolios to advanced algorithmic trading — one platform, limitless potential." tag="What We Offer">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { icon: ChartLine, title: "Stock Trading", desc: "Trade thousands of global equities with real-time quotes, fractional shares, and commission-free execution on major exchanges." },
-            { icon: Coins, title: "Crypto Trading", desc: "Buy, sell, and hold 200+ cryptocurrencies 24/7. Secure cold storage, instant settlement, and deep liquidity." },
-            { icon: Repeat2, title: "Forex & CFDs", desc: "Access 60+ currency pairs and CFDs on indices, commodities, and ETFs with up to 1:500 leverage and tight spreads." },
-            { icon: Bot, title: "Algo Trading", desc: "Build, backtest, and deploy automated strategies using our REST API and Python SDK. No-code bots also available." },
-            { icon: BriefcaseBusiness, title: "Managed Portfolios", desc: "Let our AI-driven robo-advisor or certified portfolio managers grow your wealth with risk-adjusted strategies." },
-            { icon: PiggyBank, title: "Retirement & ISA", desc: "Tax-advantaged accounts for long-term wealth building — ISA, SIPP, Roth IRA, and more depending on your region." },
-          ].map(({ icon: Icon, title, desc }) => (
-            <Card key={title} className="hover:border-primary/40 transition-colors group">
-              <CardContent className="p-6">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="font-semibold mb-2">{title}</div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </Section>
-
-      {/* ── Asset classes ── */}
+      {/* Asset classes */}
       <Section title="Markets you can trade" subtitle="One account, every major asset class.">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
@@ -181,7 +115,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      {/* ── Why us ── */}
+      {/* Why us */}
       <Section title="Why traders choose XpressPro FX" subtitle="Built for professionals, accessible to beginners.">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
@@ -203,39 +137,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      {/* ── How It Works ── */}
-      <section className="px-4 md:px-6 py-12 md:py-16 bg-card/30 border-y border-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-10 text-center">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary/10 text-primary mb-3">Getting Started</span>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Up & Running in Minutes</h2>
-            <p className="mt-2 text-muted-foreground">No paperwork, no waiting. Open your account and start investing today.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { num: 1, icon: UserPlus, title: "Create Account", desc: "Sign up in under 2 minutes. Verify your identity with a government ID and selfie." },
-              { num: 2, icon: CreditCard, title: "Fund Your Account", desc: "Deposit via bank transfer, card, or crypto. Minimum deposit from just $10." },
-              { num: 3, icon: ListChecks, title: "Choose Your Strategy", desc: "Pick from self-directed trading, copy trading, or our managed portfolio service." },
-              { num: 4, icon: Rocket, title: "Start Investing", desc: "Go live with real funds or practice on a $100K demo account — risk free." },
-            ].map(({ num, icon: Icon, title, desc }) => (
-              <div key={num} className="text-center">
-                <div className="relative mx-auto w-16 h-16 mb-5">
-                  <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-                    <Icon className="w-7 h-7 text-primary-foreground" />
-                  </div>
-                  <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-card border-2 border-primary text-[10px] font-black text-primary flex items-center justify-center">
-                    {num}
-                  </span>
-                </div>
-                <h3 className="font-bold mb-2">{title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Account types / pricing ── */}
+      {/* Account types */}
       <Section title="Choose your account" subtitle="Plans that scale with your trading style.">
         <div className="grid md:grid-cols-3 gap-4">
           {ACCOUNTS.map((a) => (
@@ -268,7 +170,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      {/* ── Platforms ── */}
+      {/* Platforms */}
       <Section title="Trade anywhere" subtitle="Web, desktop and mobile — your account, synchronized.">
         <div className="grid md:grid-cols-3 gap-4">
           {[
@@ -286,7 +188,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      {/* ── Testimonials ── */}
+      {/* Testimonials */}
       <Section title="Trusted by traders worldwide">
         <div className="grid md:grid-cols-3 gap-4">
           {TESTIMONIALS.map((t) => (
@@ -302,7 +204,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      {/* ── CTA ── */}
+      {/* CTA */}
       <section className="px-4 md:px-6 my-16">
         <div className="max-w-7xl mx-auto rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 to-transparent p-8 md:p-14 text-center">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Ready to start trading?</h2>
@@ -316,49 +218,6 @@ export function PublicHome() {
         </div>
       </section>
 
-      {/* ── Contact info row ── */}
-      <section className="px-4 md:px-6 pb-16">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">We're Here to Help</h2>
-            <p className="mt-2 text-muted-foreground">Our support team is available around the clock, every day of the year.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { icon: Mail, label: "Email Support", value: "support@xpressprofx.com" },
-              { icon: Phone, label: "Phone", value: "+1 (800) 555-XPFX" },
-              { icon: MessageSquare, label: "Live Chat", value: "Available 24/7 via chat widget" },
-              { icon: MapPin, label: "Headquarters", value: "200 Financial District, NY 10005" },
-            ].map(({ icon: Icon, label, value }) => (
-              <Card key={label}>
-                <CardContent className="p-5 flex gap-3 items-start">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
-                    <div className="text-sm font-medium">{value}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Risk Disclaimer ── */}
-      <div className="border-t border-border bg-destructive/5 px-4 md:px-6 py-4">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            <AlertTriangle className="w-3.5 h-3.5 inline text-amber-400 mr-1 -mt-0.5" />
-            <strong className="text-foreground">Risk Warning:</strong> CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage.{" "}
-            <strong>74% of retail investor accounts lose money when trading CFDs with XpressPro FX.</strong>{" "}
-            You should consider whether you understand how CFDs work and whether you can afford to take the high risk of losing your money.
-            XpressPro FX is authorised and regulated. Past performance does not guarantee future results.
-          </p>
-        </div>
-      </div>
-
       <style>{`
         @keyframes scroll {
           0% { transform: translateX(0); }
@@ -369,20 +228,11 @@ export function PublicHome() {
   );
 }
 
-function Section({
-  title, subtitle, tag, children,
-}: {
-  title: string; subtitle?: string; tag?: string; children: React.ReactNode;
-}) {
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="px-4 md:px-6 py-12 md:py-16">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center">
-          {tag && (
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary/10 text-primary mb-3">
-              {tag}
-            </span>
-          )}
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{title}</h2>
           {subtitle && <p className="mt-2 text-muted-foreground">{subtitle}</p>}
         </div>

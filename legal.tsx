@@ -1,8 +1,8 @@
 /**
  * Public Legal page
  * -----------------
- * Tabbed view of terms of service, privacy policy, risk disclosure, AML
- * policy, and cookie policy. Tab is deep-linkable via `?tab=`.
+ * Tabbed view of terms of service, privacy policy, risk disclosure and AML
+ * policy. Tab is deep-linkable via `?tab=`.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useSearch } from "wouter";
@@ -14,7 +14,6 @@ const TABS = [
   { value: "privacy", label: "Privacy policy" },
   { value: "risk", label: "Risk disclosure" },
   { value: "aml", label: "AML policy" },
-  { value: "cookies", label: "Cookie policy" },
 ] as const;
 
 type TabValue = typeof TABS[number]["value"];
@@ -85,21 +84,6 @@ export function PublicLegal() {
               { h: "Ongoing monitoring", p: "Account activity is screened continuously against sanctions lists, PEP databases and behavioral risk models." },
               { h: "Reporting", p: "We are required to report suspicious activity to the relevant Financial Intelligence Unit and may freeze affected funds during investigation." },
               { h: "Source of funds", p: "Clients may be asked to evidence the origin of deposited funds. Failure to provide satisfactory documentation may result in account closure." },
-            ]}
-          />
-        </TabsContent>
-
-        <TabsContent value="cookies">
-          <PolicyCard
-            title="Cookie policy"
-            sections={[
-              { h: "What are cookies?", p: "Cookies are small text files placed on your device by our website. They allow us to remember your preferences, maintain your session, and improve the performance and functionality of the platform." },
-              { h: "Essential cookies", p: "These cookies are strictly necessary for the website to function correctly. They include session authentication tokens and security cookies. You cannot opt out of these without disabling the platform entirely." },
-              { h: "Analytics cookies", p: "We may use analytics cookies to understand how visitors interact with our website. This helps us improve the user experience. All analytics data is aggregated and anonymised." },
-              { h: "Preference cookies", p: "These cookies remember settings such as your display theme (light/dark mode) and language preferences so you do not need to re-select them on each visit." },
-              { h: "Third-party cookies", p: "Some features, such as payment processing and customer support, may involve third-party cookies. We do not control these cookies and recommend reviewing the relevant third-party privacy policies." },
-              { h: "Managing cookies", p: "You can control and/or delete cookies through your browser settings. However, disabling certain cookies may affect the functionality of the platform. For more information, visit aboutcookies.org." },
-              { h: "Updates to this policy", p: "We may update this cookie policy periodically. Continued use of the platform after any changes constitutes your acceptance of the updated policy." },
             ]}
           />
         </TabsContent>
