@@ -1,52 +1,24 @@
-/**
- * /managers routes — list managers, get/select assigned manager.
- */
-import { Router, type IRouter } from "express";
-import { SelectManagerBody } from "@workspace/api-zod";
-import { logActivity, managers } from "../lib/store";
-import { requireAuth } from "../lib/session";
+import { pgTable, text, numeric, integer, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
 
-const router: IRouter = Router();
-
-router.get("/managers", requireAuth, (_req, res) => {
-  res.json(managers);
+export const managersTable = pgTable("managers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  avatarUrl: text("avatar_url"),
+  title: text("title").notNull(),
+  experience: integer("experience").notNull().default(1),
+  strategy: text("strategy").notNull(),
+  performance: numeric("performance", { precision: 5, scale: 2 }).notNull().default("0"),
+  totalClients: integer("total_clients").notNull().default(0),
+  winRate: numeric("win_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  specialization: text("specialization").notNull(),
+  bio: text("bio").notNull().default(""),
+  contactEmail: text("contact_email").notNull(),
+  available: boolean("available").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-router.get("/managers/selected", requireAuth, (req, res) => {
-  const u = req.storedUser!.user;
-  if (!u.selectedManagerId) {
-    return res.json({ manager: null });
-  }
-  const manager = managers.find((m) => m.id === u.selectedManagerId) ?? null;
-  return res.json({ manager });
-});
-
-router.post("/managers/selected", requireAuth, (req, res) => {
-  const parsed = SelectManagerBody.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ success: false, message: "Invalid request" });
-  }
-  const manager = managers.find((m) => m.id === parsed.data.managerId);
-  if (!manager) {
-    return res.status(404).json({ success: false, message: "Manager not found" });
-  }
-  if (!manager.available) {
-    return res.json({
-      success: false,
-      message: `${manager.name} is not currently accepting new clients.`,
-    });
-  }
-  req.storedUser!.user.selectedManagerId = manager.id;
-  logActivity({
-    actorId: req.userId!,
-    actorName: req.storedUser!.user.fullName,
-    action: "manager.select",
-    detail: `Selected ${manager.name} as account manager`,
-  });
-  return res.json({
-    success: true,
-    message: `${manager.name} is now your account manager.`,
-  });
-});
-
-export default router;
+export const insertManagerSchema = createInsertSchema(managersTable).omit({ id: true, createdAt: true });
+export type InsertManager = z.infer<typeof insertManagerSchema>;
+export type Manager = typeof managersTable.$inferSelect;

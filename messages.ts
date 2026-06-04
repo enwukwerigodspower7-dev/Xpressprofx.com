@@ -1,98 +1,22 @@
-/**
- * /messages routes — fetch and send messages across manager / p2p / support contexts.
- */
-import { Router, type IRouter } from "express";
-import {
-  GetMessagesQueryParams,
-  SendMessageBody,
-  type Message,
-} from "@workspace/api-zod";
-import { getUserData, managers, newId, NOW } from "../lib/store";
-import { requireAuth } from "../lib/session";
+import { pgTable, text, boolean, timestamp, uuid, pgEnum } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
 
-const router: IRouter = Router();
+export const messageContextEnum = pgEnum("message_context", ["manager", "p2p", "support"]);
 
-function threadKey(context: string, contextId?: string | null): string {
-  return `${context}:${contextId ?? "default"}`;
-}
-
-router.get("/messages", requireAuth, (req, res) => {
-  const data = getUserData(req.userId!);
-  const parsed = GetMessagesQueryParams.safeParse(req.query);
-  const context = parsed.success ? parsed.data.context ?? "manager" : "manager";
-  const contextId = parsed.success ? parsed.data.contextId : undefined;
-  const key = threadKey(context, contextId ?? null);
-  res.json(data.messages.get(key) ?? []);
+export const messagesTable = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  senderId: uuid("sender_id").notNull(),
+  senderName: text("sender_name").notNull(),
+  senderAvatar: text("sender_avatar"),
+  recipientId: uuid("recipient_id"),
+  content: text("content").notNull(),
+  context: messageContextEnum("context").notNull(),
+  contextId: text("context_id"),
+  isFromUser: boolean("is_from_user").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-router.post("/messages", requireAuth, (req, res) => {
-  const parsed = SendMessageBody.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Invalid message", details: parsed.error.issues });
-  }
-  const u = req.storedUser!.user;
-  const data = getUserData(req.userId!);
-  const { context, contextId, content } = parsed.data;
-  const key = threadKey(context, contextId);
-  const list = data.messages.get(key) ?? [];
-  const userMsg: Message = {
-    id: newId("msg"),
-    senderId: u.id,
-    senderName: u.fullName,
-    senderAvatar: u.avatarUrl ?? null,
-    content,
-    context,
-    contextId: contextId ?? null,
-    isFromUser: true,
-    createdAt: NOW(),
-  };
-  list.push(userMsg);
-
-  if (context === "manager" && u.selectedManagerId) {
-    const manager = managers.find((m) => m.id === u.selectedManagerId);
-    if (manager) {
-      const replies = [
-        "Got it — I'll factor that into the next entry.",
-        "Noted. Watching the order book closely on this one.",
-        "Understood. I'll update you once we hit the next level.",
-        "Thanks for the heads-up. Adjusting position size accordingly.",
-      ];
-      const reply: Message = {
-        id: newId("msg"),
-        senderId: manager.id,
-        senderName: manager.name,
-        senderAvatar: manager.avatarUrl,
-        content: replies[Math.floor(Math.random() * replies.length)] ?? "Got it.",
-        context: "manager",
-        contextId: null,
-        isFromUser: false,
-        createdAt: new Date(Date.now() + 1500).toISOString(),
-      };
-      list.push(reply);
-    }
-  } else if (context === "support" && contextId) {
-    // Append to ticket thread too
-    const ticket = data.supportTickets.find((t) => t.id === contextId);
-    if (ticket) {
-      ticket.messages.push(userMsg);
-      ticket.updatedAt = NOW();
-      const reply: Message = {
-        id: newId("stm"),
-        senderId: "support_agent",
-        senderName: "XpressPro FX Support",
-        senderAvatar: null,
-        content: "Thanks — a specialist will follow up shortly.",
-        context: "support",
-        contextId,
-        isFromUser: false,
-        createdAt: new Date(Date.now() + 2000).toISOString(),
-      };
-      list.push(reply);
-      ticket.messages.push(reply);
-    }
-  }
-  data.messages.set(key, list);
-  return res.json(userMsg);
-});
-
-export default router;
+export const insertMessageSchema = createInsertSchema(messagesTable).omit({ id: true, createdAt: true });
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messagesTable.$inferSelect;

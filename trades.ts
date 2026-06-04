@@ -1,73 +1,28 @@
-/**
- * /trades routes — trade history, social trading wallet, releasing trade funds.
- */
-import { Router, type IRouter } from "express";
-import { getUserData, logActivity } from "../lib/store";
-import { requireAuth } from "../lib/session";
-import { enforceGasFee } from "../lib/gas-fee-gate";
-import { notifyUser } from "../lib/notify";
+import { pgTable, text, numeric, timestamp, uuid, pgEnum, integer } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
 
-const router: IRouter = Router();
+export const tradeTypeEnum = pgEnum("trade_type", ["long", "short"]);
+export const tradeStatusEnum = pgEnum("trade_status", ["active", "completed", "cancelled"]);
 
-router.get("/trades", requireAuth, (req, res) => {
-  res.json(getUserData(req.userId!).trades);
+export const tradesTable = pgTable("trades", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull(),
+  pair: text("pair").notNull(),
+  type: tradeTypeEnum("type").notNull(),
+  status: tradeStatusEnum("status").notNull().default("active"),
+  entryPrice: numeric("entry_price", { precision: 20, scale: 8 }).notNull(),
+  currentPrice: numeric("current_price", { precision: 20, scale: 8 }).notNull(),
+  targetPrice: numeric("target_price", { precision: 20, scale: 8 }).notNull(),
+  amount: numeric("amount", { precision: 20, scale: 8 }).notNull(),
+  currency: text("currency").notNull().default("USDT"),
+  profit: numeric("profit", { precision: 20, scale: 8 }).notNull().default("0"),
+  expectedProfit: numeric("expected_profit", { precision: 20, scale: 8 }).notNull().default("0"),
+  managerId: text("manager_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
-router.get("/trades/social-wallet", requireAuth, (req, res) => {
-  const data = getUserData(req.userId!);
-  const completedProfits = data.trades
-    .filter((t) => t.status === "completed")
-    .reduce((sum, t) => sum + t.profit, 0);
-  const activeProfits = data.trades
-    .filter((t) => t.status === "active")
-    .reduce((sum, t) => sum + t.profit, 0);
-  res.json({
-    totalProfits: completedProfits,
-    pendingProfits: activeProfits,
-    currency: "USD",
-    locked: data.socialLocked,
-    activeTrades: data.trades.filter((t) => t.status === "active").length,
-  });
-});
-
-router.post("/trades/:tradeId/release", requireAuth, (req, res) => {
-  if (!enforceGasFee(req, res, "trade_release")) return;
-  if (req.storedUser!.tradingLocked) {
-    return res.status(403).json({ success: false, message: "Trading is locked on your account." });
-  }
-  const data = getUserData(req.userId!);
-  const trade = data.trades.find((t) => t.id === req.params["tradeId"]);
-  if (!trade) {
-    return res.status(404).json({ success: false, message: "Trade not found" });
-  }
-  if (trade.status !== "completed") {
-    return res.json({
-      success: false,
-      message: "Only completed trades can be released.",
-    });
-  }
-  const main = data.wallets.find((w) => w.type === "main");
-  if (main) main.balance = Math.round((main.balance + trade.profit) * 100) / 100;
-  const released = trade.profit;
-  trade.profit = 0;
-  logActivity({
-    actorId: req.userId!,
-    actorName: req.storedUser!.user.fullName,
-    action: "trade.release",
-    detail: `Released $${released} from ${trade.pair} to main wallet`,
-  });
-  notifyUser({
-    userId: req.userId!,
-    kind: "trade_released",
-    emailToggle: "tradeOpened",
-    title: "Trade profits released",
-    body: `$${released.toFixed(2)} from your ${trade.pair} trade has been moved to your main wallet.`,
-    link: "/trades",
-  });
-  return res.json({
-    success: true,
-    message: `Released funds to your main wallet.`,
-  });
-});
-
-export default router;
+export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true, createdAt: true });
+export type InsertTrade = z.infer<typeof insertTradeSchema>;
+export type Trade = typeof tradesTable.$inferSelect;
