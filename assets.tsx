@@ -1,339 +1,297 @@
-import { useState } from "react";
 import {
-  useGetAdminAssets,
-  useCreateAdminAsset,
-  useUpdateAdminAsset,
-  useDeleteAdminAsset,
+  useGetAssetCatalog,
+  usePurchaseAsset,
+  useSendFromConnectedWallet,
+  useGetPlatformReceivingAddress,
+  getGetWalletsQueryKey,
+  getGetTransactionsQueryKey,
+  getGetConnectedWalletBalanceQueryKey,
 } from "@workspace/api-client-react";
-import { Coins, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingUp, TrendingDown, ShoppingCart, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { PaymentSourceSelector, type PaymentSource } from "@/components/payment-source-selector";
+import { ManualTxHashInput } from "@/components/manual-tx-hash-input";
 
-export function AssetsPage() {
-  const { data: assets, isLoading, refetch } = useGetAdminAssets();
-  const createMutation = useCreateAdminAsset();
-  const updateMutation = useUpdateAdminAsset();
-  const deleteMutation = useDeleteAdminAsset();
-
-  const [showCreate, setShowCreate] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-
-  const [form, setForm] = useState({
-    symbol: "",
-    name: "",
-    category: "crypto" as "crypto" | "stock" | "etf" | "forex" | "commodity",
-    price: "",
-    currency: "USD",
-    imageUrl: "",
-  });
-  const [editForm, setEditForm] = useState({
-    name: "",
-    category: "crypto" as "crypto" | "stock" | "etf" | "forex" | "commodity",
-    price: "",
-    change24h: "0",
-    currency: "USD",
-    imageUrl: "",
-    available: true,
-  });
-
-  const startEdit = (a: NonNullable<typeof assets>[number]) => {
-    setEditId(a.id);
-    setEditForm({
-      name: a.name,
-      category: "crypto",
-      price: String(a.price),
-      change24h: String(a.change24h ?? 0),
-      currency: a.currency,
-      imageUrl: a.logoUrl ?? "",
-      available: a.available,
-    });
-  };
-
-  const submitCreate = async () => {
-    if (!form.symbol.trim() || !form.name.trim() || !form.price) return;
-    await createMutation.mutateAsync({
-      data: {
-        symbol: form.symbol.trim().toUpperCase(),
-        name: form.name.trim(),
-        category: form.category,
-        price: parseFloat(form.price),
-        currency: form.currency.trim().toUpperCase(),
-        imageUrl: form.imageUrl.trim() || null,
-      },
-    });
-    setForm({ symbol: "", name: "", category: "crypto", price: "", currency: "USD", imageUrl: "" });
-    setShowCreate(false);
-    refetch();
-  };
-
-  const submitEdit = async () => {
-    if (!editId) return;
-    await updateMutation.mutateAsync({
-      assetId: editId,
-      data: {
-        name: editForm.name,
-        category: editForm.category,
-        price: parseFloat(editForm.price),
-        change24h: parseFloat(editForm.change24h || "0"),
-        currency: editForm.currency.toUpperCase(),
-        imageUrl: editForm.imageUrl.trim() || null,
-        available: editForm.available,
-      },
-    });
-    setEditId(null);
-    refetch();
-  };
-
-  const remove = async (assetId: string, symbol: string) => {
-    if (!confirm(`Remove asset ${symbol}? Existing trades won't be affected.`)) return;
-    await deleteMutation.mutateAsync({ assetId });
-    refetch();
-  };
+export function Assets() {
+  const { data: assets, isLoading } = useGetAssetCatalog();
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Coins className="w-5 h-5 text-primary" />
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Assets</h1>
-            <p className="text-sm text-muted-foreground">Catalog of tradable assets and their reference prices.</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-4 h-4" /> New Asset
-        </button>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Market Assets</h1>
+        <p className="text-muted-foreground mt-1">Browse and purchase available cryptocurrencies</p>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl overflow-hidden">
-       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Asset</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Price</th>
-              <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">24h</th>
-              <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            ) : (assets ?? []).length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No assets in catalog.</td></tr>
-            ) : (
-              (assets ?? []).map((a) => (
-                <tr key={a.id} className="hover:bg-accent/30">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {a.logoUrl ? (
-                        <img src={a.logoUrl} alt={a.symbol} className="w-7 h-7 rounded-full" />
-                      ) : (
-                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                          {a.symbol[0]}
-                        </div>
-                      )}
-                      <span className="font-bold text-foreground">{a.symbol}</span>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
+        {isLoading ? (
+          [1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-48 w-full" />)
+        ) : (
+          assets?.map(asset => (
+            <Card key={asset.id} className="hover:border-primary/50 transition-colors">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    {asset.logoUrl ? (
+                      <img src={asset.logoUrl} alt={asset.symbol} className="w-10 h-10 rounded-full" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-bold text-secondary-foreground">
+                        {asset.symbol.slice(0, 2)}
+                      </div>
+                    )}
+                    <div>
+                      <CardTitle className="text-lg">{asset.name}</CardTitle>
+                      <span className="text-sm text-muted-foreground font-medium">{asset.symbol}</span>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{a.name}</td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">
-                    {a.price.toLocaleString()} {a.currency}
-                  </td>
-                  <td className={`px-4 py-3 text-center text-xs font-medium ${a.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {a.change24h >= 0 ? "+" : ""}{a.change24h.toFixed(2)}%
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                      a.available ? "bg-green-500/20 text-green-400" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {a.available ? "Available" : "Disabled"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => startEdit(a)}
-                        className="text-xs text-primary hover:opacity-80"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => remove(a.id, a.symbol)}
-                        className="text-destructive hover:opacity-70"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-       </div>
-      </div>
-
-      {showCreate && (
-        <Modal title="Add Asset" onClose={() => setShowCreate(false)}>
-          <div className="space-y-3">
-            <Field label="Symbol">
-              <input
-                value={form.symbol}
-                onChange={(e) => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
-                placeholder="BTC"
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm uppercase"
-              />
-            </Field>
-            <Field label="Name">
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Bitcoin"
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              />
-            </Field>
-            <Field label="Category">
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value as typeof form.category })}
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              >
-                <option value="crypto">crypto</option>
-                <option value="stock">stock</option>
-                <option value="etf">etf</option>
-                <option value="forex">forex</option>
-                <option value="commodity">commodity</option>
-              </select>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Price">
-                <input
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="65000"
-                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-                />
-              </Field>
-              <Field label="Currency">
-                <input
-                  value={form.currency}
-                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm uppercase"
-                />
-              </Field>
-            </div>
-            <Field label="Image URL (optional)">
-              <input
-                value={form.imageUrl}
-                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                placeholder="https://..."
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              />
-            </Field>
-            <button
-              onClick={submitCreate}
-              disabled={createMutation.isPending}
-              className="w-full bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-60"
-            >
-              {createMutation.isPending ? "Creating..." : "Create Asset"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {editId && (
-        <Modal title="Edit Asset" onClose={() => setEditId(null)}>
-          <div className="space-y-3">
-            <Field label="Name">
-              <input
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Price">
-                <input
-                  type="number"
-                  value={editForm.price}
-                  onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-                />
-              </Field>
-              <Field label="Currency">
-                <input
-                  value={editForm.currency}
-                  onChange={(e) => setEditForm({ ...editForm, currency: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm uppercase"
-                />
-              </Field>
-            </div>
-            <Field label="24h change %">
-              <input
-                type="number"
-                step="0.01"
-                value={editForm.change24h}
-                onChange={(e) => setEditForm({ ...editForm, change24h: e.target.value })}
-                placeholder="e.g. -1.25 or 3.4"
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              />
-            </Field>
-            <Field label="Image URL">
-              <input
-                value={editForm.imageUrl}
-                onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
-                className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={editForm.available}
-                onChange={(e) => setEditForm({ ...editForm, available: e.target.checked })}
-              />
-              Available for trading
-            </label>
-            <button
-              onClick={submitEdit}
-              disabled={updateMutation.isPending}
-              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-60"
-            >
-              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save Changes
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card border border-card-border rounded-xl p-5 max-w-md w-full">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {children}
+                  </div>
+                  <div className={`flex items-center gap-1 text-sm font-medium ${asset.change24h >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {asset.change24h >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {Math.abs(asset.change24h)}%
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Current Price</div>
+                    <div className="text-2xl font-bold">${asset.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</div>
+                  </div>
+                  <PurchaseAssetDialog asset={asset} />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function PurchaseAssetDialog({ asset }: { asset: any }) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [source, setSource] = useState<PaymentSource | null>(null);
+  const [settlementAsset, setSettlementAsset] = useState<"USDT" | "USDC" | "DAI">("USDT");
+  const [manualTxHash, setManualTxHash] = useState("");
+  const purchase = usePurchaseAsset();
+  const sendFromWallet = useSendFromConnectedWallet();
+  const { data: platform } = useGetPlatformReceivingAddress();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Map the unified PaymentSource into the purchase endpoint's
+  // paymentMethod enum. Platform → main_wallet, banks → bank_transfer,
+  // external wallets → external_wallet (settled on-chain by calling
+  // /wallets/connected/{id}/send to the platform's receiving address
+  // *before* posting the purchase).
+  const paymentMethod: "main_wallet" | "card" | "bank_transfer" | "external_wallet" =
+    source?.kind === "platform_wallet"
+      ? "main_wallet"
+      : source?.kind === "external_wallet"
+        ? "external_wallet"
+        : source?.kind === "bank"
+          ? "bank_transfer"
+          : "card";
+
+  const totalCost = (Number(amount) || 0) * asset.price;
+
+  const handlePurchase = async () => {
+    if (!source) {
+      toast({
+        title: "Pick a funding source",
+        description: "Choose a wallet or bank to pay with.",
+        variant: "destructive",
+      });
+      return;
+    }
+    let externalWalletId: string | null = null;
+    let txHash: string | null = null;
+    if (source.kind === "external_wallet") {
+      const reusedHash = manualTxHash.trim();
+      if (reusedHash) {
+        externalWalletId = source.id;
+        txHash = reusedHash;
+      } else {
+        if (!platform?.address) {
+          toast({
+            title: "Platform receiving address unavailable",
+            description: "Try again in a moment.",
+            variant: "destructive",
+          });
+          return;
+        }
+        try {
+          const send = await sendFromWallet.mutateAsync({
+            walletId: source.id,
+            data: {
+              to: platform.address,
+              asset: settlementAsset,
+              amount: totalCost,
+            },
+          });
+          if (!send.success || !send.hash) {
+            toast({
+              title: "On-chain payment failed",
+              description: send.message ?? "Could not broadcast the on-chain transfer.",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (send.status !== 1) {
+            setManualTxHash(send.hash);
+            queryClient.invalidateQueries({
+              queryKey: getGetConnectedWalletBalanceQueryKey(source.id),
+            });
+            toast({
+              title: "Awaiting on-chain confirmation",
+              description: `Tx ${send.hash.slice(0, 14)}… broadcast. Click Confirm again once it confirms — the hash is now saved for retry.`,
+            });
+            return;
+          }
+          externalWalletId = source.id;
+          txHash = send.hash;
+          queryClient.invalidateQueries({
+            queryKey: getGetConnectedWalletBalanceQueryKey(source.id),
+          });
+          toast({
+            title: "On-chain payment confirmed",
+            description: `Tx ${send.hash.slice(0, 14)}… Settling purchase.`,
+          });
+        } catch (err: unknown) {
+          toast({
+            title: "On-chain payment failed",
+            description: err instanceof Error ? err.message : "Could not send on-chain payment.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+    purchase.mutate(
+      {
+        data: {
+          assetId: asset.id,
+          amount: Number(amount),
+          paymentMethod,
+          externalWalletId,
+          txHash,
+          settlementAsset: source.kind === "external_wallet" ? settlementAsset : null,
+        },
+      },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: res.success ? "Purchase Successful" : "Purchase Failed",
+            description: `${res.message} (paid via ${source.label})`,
+            variant: res.success ? "default" : "destructive",
+          });
+          queryClient.invalidateQueries({ queryKey: getGetWalletsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetTransactionsQueryKey() });
+          if (res.success) {
+            setOpen(false);
+            setAmount("");
+            setManualTxHash("");
+          }
+        },
+        onError: () => {
+          toast({ title: "Purchase Failed", description: "Could not complete the transaction.", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const isExternal = source?.kind === "external_wallet";
+  const inFlight = purchase.isPending || sendFromWallet.isPending;
+
   return (
-    <div>
-      <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
-      {children}
-    </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button disabled={!asset.available}><ShoppingCart className="h-4 w-4 mr-2" /> Buy</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Buy {asset.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="p-4 bg-muted rounded-lg flex justify-between items-center">
+            <span className="font-medium text-muted-foreground">Price</span>
+            <span className="font-bold">${asset.price.toLocaleString()}</span>
+          </div>
+          <div className="space-y-2">
+            <Label>Amount ({asset.symbol})</Label>
+            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" min="0" step="0.0001" />
+          </div>
+          <PaymentSourceSelector
+            value={source}
+            onChange={setSource}
+            label="Payment source"
+            showLiveBalance
+            testId="select-purchase-payment-source"
+          />
+          {isExternal && (
+            <>
+              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Settle in</Label>
+                  <select
+                    className="bg-background border border-input rounded px-2 py-1 text-xs"
+                    value={settlementAsset}
+                    onChange={(e) => setSettlementAsset(e.target.value as "USDT" | "USDC" | "DAI")}
+                    data-testid="select-settlement-asset"
+                  >
+                    <option value="USDT">USDT</option>
+                    <option value="USDC">USDC</option>
+                    <option value="DAI">DAI</option>
+                  </select>
+                </div>
+                <div className="text-muted-foreground">
+                  {platform?.address ? (
+                    <>
+                      Sends ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {settlementAsset} on-chain to platform address{" "}
+                      <span className="font-mono">{platform.address.slice(0, 8)}…{platform.address.slice(-6)}</span>.
+                    </>
+                  ) : (
+                    "Loading platform receiving address…"
+                  )}
+                </div>
+              </div>
+              <ManualTxHashInput
+                value={manualTxHash}
+                onChange={setManualTxHash}
+                testId="input-purchase-manual-tx-hash"
+              />
+            </>
+          )}
+          <div className="pt-4 border-t flex justify-between items-center">
+            <span className="font-semibold">Total Cost</span>
+            <span className="text-xl font-bold">${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handlePurchase}
+            disabled={!amount || Number(amount) <= 0 || inFlight || !source || (isExternal && !manualTxHash.trim() && !platform?.address)}
+            data-testid="button-confirm-purchase"
+          >
+            {inFlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {sendFromWallet.isPending
+              ? "Broadcasting on-chain…"
+              : purchase.isPending
+                ? "Settling…"
+                : isExternal && manualTxHash.trim()
+                  ? "Settle with tx hash"
+                  : "Confirm Purchase"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

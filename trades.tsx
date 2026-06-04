@@ -1,410 +1,429 @@
-import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import {
-  useGetAdminTrades,
-  useUpdateAdminUserTrade,
-  useDeleteAdminUserTrade,
-  useCreateAdminUserTrade,
-  useGetAdminUsers,
-  type AdminTradeRow,
+  useGetTrades,
+  useGetSocialTradingWallet,
+  useReleaseTradeFunds,
+  useCreateDeposit,
+  useSendFromConnectedWallet,
+  useGetPlatformReceivingAddress,
+  getGetTradesQueryKey,
+  getGetSocialTradingWalletQueryKey,
+  getGetDepositsQueryKey,
+  getGetConnectedWalletBalanceQueryKey,
 } from "@workspace/api-client-react";
-import { TrendingUp, Loader2, Trash2, Plus, Save, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  LockKeyhole,
+  ArrowRightCircle,
+  Wallet as WalletIcon,
+  Loader2,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { PaymentSourceSelector, type PaymentSource } from "@/components/payment-source-selector";
+import { ManualTxHashInput } from "@/components/manual-tx-hash-input";
 
-export function TradesPage() {
-  const { data: trades, isLoading, refetch } = useGetAdminTrades();
-  const { data: users } = useGetAdminUsers();
-  const updateMutation = useUpdateAdminUserTrade();
-  const deleteMutation = useDeleteAdminUserTrade();
-  const createMutation = useCreateAdminUserTrade();
-  const [, navigate] = useLocation();
-  const [filter, setFilter] = useState<"all" | "active" | "completed" | "cancelled">("all");
-  const [showCreate, setShowCreate] = useState(false);
-  const [editTrade, setEditTrade] = useState<AdminTradeRow | null>(null);
+export function Trades() {
+  const { data: trades, isLoading: isLoadingTrades } = useGetTrades();
+  const { data: socialWallet, isLoading: isLoadingSocial } = useGetSocialTradingWallet();
+  const releaseFunds = useReleaseTradeFunds();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const filtered = (trades ?? []).filter((t) => filter === "all" || t.status === filter);
-
-  const setStatus = async (
-    userId: string,
-    tradeId: string,
-    status: "active" | "completed" | "cancelled",
-  ) => {
-    await updateMutation.mutateAsync({ userId, tradeId, data: { status } });
-    refetch();
+  const handleRelease = (tradeId: string) => {
+    releaseFunds.mutate({ tradeId }, {
+      onSuccess: () => {
+        toast({ title: "Funds Released", description: "Profits transferred to your main wallet." });
+        queryClient.invalidateQueries({ queryKey: getGetTradesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetSocialTradingWalletQueryKey() });
+      },
+      onError: () => {
+        toast({ title: "Release Failed", description: "Failed to release funds. Try again.", variant: "destructive" });
+      }
+    });
   };
 
-  const remove = async (userId: string, tradeId: string) => {
-    if (!confirm("Delete this trade? This will not refund any balances.")) return;
-    await deleteMutation.mutateAsync({ userId, tradeId });
-    refetch();
-  };
+  const activeTrades = trades?.filter(t => t.status === 'active') || [];
+  const pastTrades = trades?.filter(t => t.status !== 'active') || [];
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <div>
-            <h1 className="text-xl font-bold text-foreground">All Trades</h1>
-            <p className="text-sm text-muted-foreground">Every trade across every user account.</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 bg-muted/30 rounded-lg p-1">
-            {(["all", "active", "completed", "cancelled"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  filter === f ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm font-medium hover:opacity-90"
-          >
-            <Plus className="w-4 h-4" /> Open Trade
-          </button>
-        </div>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Trading Desk</h1>
+        <p className="text-muted-foreground mt-1">Monitor active positions and social trading performance</p>
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl overflow-hidden">
-       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">User</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pair</th>
-              <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Amount</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Profit</th>
-              <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {isLoading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin inline" /></td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No trades found.</td></tr>
-            ) : (
-              filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-accent/30">
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => navigate(`/users/${t.userId}`)}
-                      className="text-left hover:text-primary"
-                    >
-                      <p className="font-medium text-foreground">{t.userName}</p>
-                      <p className="text-xs text-muted-foreground">{t.userEmail}</p>
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-foreground">{t.pair}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                      t.type === "long" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                    }`}>{t.type}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-foreground">
-                    {t.amount.toLocaleString()} {t.currency}
-                  </td>
-                  <td className={`px-4 py-3 text-right font-medium ${t.profit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {t.profit >= 0 ? "+" : ""}{t.profit.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                      t.status === "active" ? "bg-blue-500/20 text-blue-400" :
-                      t.status === "completed" ? "bg-green-500/20 text-green-400" :
-                      "bg-muted text-muted-foreground"
-                    }`}>{t.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {t.status === "active" && (
-                        <>
-                          <button
-                            onClick={() => setEditTrade(t)}
-                            className="text-xs text-primary hover:opacity-80"
-                          >
-                            Edit P/L
-                          </button>
-                          <button
-                            onClick={() => setStatus(t.userId, t.id, "completed")}
-                            className="text-xs text-green-400 hover:opacity-80"
-                          >
-                            Complete
-                          </button>
-                          <button
-                            onClick={() => setStatus(t.userId, t.id, "cancelled")}
-                            className="text-xs text-yellow-400 hover:opacity-80"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => remove(t.userId, t.id)}
-                        className="text-destructive hover:opacity-70"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+      <div className="grid gap-6 md:grid-cols-4">
+        {/* Social Trading Summary Panel */}
+        <div className="md:col-span-1 space-y-6">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UsersIcon className="h-5 w-5 text-primary" />
+                Social Wallet
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingSocial ? (
+                <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-full" /></div>
+              ) : (
+                <>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Total Profits</div>
+                    <div className="text-2xl font-bold text-success">
+                      +${socialWallet?.totalProfits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-       </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Pending</div>
+                    <div className="text-lg font-semibold">
+                      ${socialWallet?.pendingProfits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    {socialWallet?.locked ? (
+                      <Badge variant="outline" className="text-warning border-warning"><LockKeyhole className="h-3 w-3 mr-1" /> Locked</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-success border-success"><CheckCircle2 className="h-3 w-3 mr-1" /> Active</Badge>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <FundTradingWalletPanel />
+        </div>
+
+        {/* Trades List */}
+        <div className="md:col-span-3 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Positions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTrades ? (
+                <div className="space-y-4"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+              ) : activeTrades.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No active positions.</div>
+              ) : (
+                <div className="space-y-4">
+                  {activeTrades.map(trade => (
+                    <TradeItem key={trade.id} trade={trade} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTrades ? (
+                 <div className="space-y-4"><Skeleton className="h-16 w-full" /></div>
+              ) : pastTrades.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No past trades.</div>
+              ) : (
+                <div className="space-y-4">
+                  {pastTrades.map(trade => (
+                    <TradeItem key={trade.id} trade={trade} onRelease={() => handleRelease(trade.id)} isReleasing={releaseFunds.isPending} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {showCreate && (
-        <CreateTradeModal
-          users={(users ?? []).map((u) => ({ id: u.id, name: u.fullName, email: u.email }))}
-          isPending={createMutation.isPending}
-          onClose={() => setShowCreate(false)}
-          onSubmit={async (userId, body) => {
-            await createMutation.mutateAsync({ userId, data: body });
-            setShowCreate(false);
-            refetch();
-          }}
-        />
-      )}
-
-      {editTrade && (
-        <EditFiguresModal
-          trade={editTrade}
-          isPending={updateMutation.isPending}
-          onClose={() => setEditTrade(null)}
-          onSubmit={async (data) => {
-            await updateMutation.mutateAsync({ userId: editTrade.userId, tradeId: editTrade.id, data });
-            setEditTrade(null);
-            refetch();
-          }}
-        />
-      )}
     </div>
   );
 }
 
-function CreateTradeModal({
-  users,
-  isPending,
-  onClose,
-  onSubmit,
-}: {
-  users: { id: string; name: string; email: string }[];
-  isPending: boolean;
-  onClose: () => void;
-  onSubmit: (
-    userId: string,
-    body: {
-      pair: string;
-      type: "long" | "short";
-      amount: number;
-      entryPrice: number;
-      currentPrice: number;
-      targetPrice: number;
-      profit: number;
-      expectedProfit: number;
-      currency: string;
-      status: "active";
-    },
-  ) => Promise<void>;
-}) {
-  const [userId, setUserId] = useState("");
-  const [search, setSearch] = useState("");
-  const [form, setForm] = useState({
-    pair: "",
-    type: "long" as "long" | "short",
-    amount: "",
-    entryPrice: "",
-    currentPrice: "",
-    targetPrice: "",
-    profit: "0",
-    expectedProfit: "0",
-    currency: "USD",
-  });
+function FundTradingWalletPanel() {
+  const [amount, setAmount] = useState("");
+  const [source, setSource] = useState<PaymentSource | null>(null);
+  const [settlementAsset, setSettlementAsset] = useState<"USDT" | "USDC" | "DAI">("USDT");
+  const [manualTxHash, setManualTxHash] = useState("");
+  const createDeposit = useCreateDeposit();
+  const sendFromWallet = useSendFromConnectedWallet();
+  const { data: platform } = useGetPlatformReceivingAddress();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const isExternal = source?.kind === "external_wallet";
+  const inFlight = createDeposit.isPending || sendFromWallet.isPending;
 
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users.slice(0, 50);
-    return users.filter(
-      (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
-    ).slice(0, 50);
-  }, [users, search]);
-
-  const submit = async () => {
-    if (!userId || !form.pair || !form.amount || !form.entryPrice) return;
-    const entry = parseFloat(form.entryPrice);
-    await onSubmit(userId, {
-      pair: form.pair.toUpperCase(),
-      type: form.type,
-      amount: parseFloat(form.amount),
-      entryPrice: entry,
-      currentPrice: parseFloat(form.currentPrice || form.entryPrice),
-      targetPrice: parseFloat(form.targetPrice || form.entryPrice),
-      profit: parseFloat(form.profit || "0"),
-      expectedProfit: parseFloat(form.expectedProfit || "0"),
-      currency: form.currency.toUpperCase(),
-      status: "active",
-    });
+  const handleAllocate = async () => {
+    const value = Number(amount);
+    if (!source) {
+      toast({
+        title: "Pick a funding source",
+        description: "Choose where the trading capital should come from.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      toast({
+        title: "Enter an amount",
+        description: "Allocation must be greater than zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+    let externalWalletId: string | null = null;
+    let txHash: string | null = null;
+    let depositCurrency = "USD";
+    let depositMethod: "bank_transfer" | "card" | "crypto_wallet" =
+      source.kind === "bank" ? "bank_transfer" : "card";
+    if (isExternal) {
+      const reusedHash = manualTxHash.trim();
+      if (reusedHash) {
+        externalWalletId = source.id;
+        txHash = reusedHash;
+        depositCurrency = settlementAsset;
+        depositMethod = "crypto_wallet";
+      } else {
+        if (!platform?.address) {
+          toast({
+            title: "Platform receiving address unavailable",
+            description: "Try again in a moment.",
+            variant: "destructive",
+          });
+          return;
+        }
+        try {
+          const send = await sendFromWallet.mutateAsync({
+            walletId: source.id,
+            data: { to: platform.address, asset: settlementAsset, amount: value },
+          });
+          if (!send.success || !send.hash) {
+            toast({
+              title: "On-chain allocation failed",
+              description: send.message ?? "Could not broadcast the on-chain transfer.",
+              variant: "destructive",
+            });
+            return;
+          }
+          if (send.status !== 1) {
+            setManualTxHash(send.hash);
+            queryClient.invalidateQueries({
+              queryKey: getGetConnectedWalletBalanceQueryKey(source.id),
+            });
+            toast({
+              title: "Awaiting on-chain confirmation",
+              description: `Tx ${send.hash.slice(0, 14)}… broadcast. Click Allocate again once it confirms — the hash is now saved for retry.`,
+            });
+            return;
+          }
+          externalWalletId = source.id;
+          txHash = send.hash;
+          depositCurrency = settlementAsset;
+          depositMethod = "crypto_wallet";
+          queryClient.invalidateQueries({
+            queryKey: getGetConnectedWalletBalanceQueryKey(source.id),
+          });
+        } catch (err: unknown) {
+          toast({
+            title: "On-chain allocation failed",
+            description: err instanceof Error ? err.message : "Could not send on-chain payment.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+    try {
+      await createDeposit.mutateAsync({
+        data: {
+          amount: value,
+          currency: depositCurrency,
+          method: depositMethod,
+          reference: `Trading capital via ${source.label}`,
+          externalWalletId,
+          txHash,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: getGetDepositsQueryKey() });
+      toast({
+        title: "Allocation submitted",
+        description: txHash
+          ? `On-chain tx ${txHash.slice(0, 14)}… recorded. Capital credited after settlement.`
+          : `Funding via ${source.label}. Funds will appear after settlement.`,
+      });
+      setAmount("");
+      setManualTxHash("");
+    } catch (err: unknown) {
+      toast({
+        title: "Allocation failed",
+        description: err instanceof Error ? err.message : "Could not record the allocation.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    <Modal title="Open New Trade" onClose={onClose}>
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">User</label>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm mb-1"
+    <Card data-testid="card-fund-trading-wallet">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <WalletIcon className="h-5 w-5 text-primary" />
+          Allocate Capital
+        </CardTitle>
+        <CardDescription>
+          Top up your trading wallet from any source.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="trade-allocate-amount">Amount</Label>
+          <Input
+            id="trade-allocate-amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            data-testid="input-trade-allocate-amount"
           />
-          <select
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-            size={5}
-          >
-            {filteredUsers.length === 0 ? (
-              <option value="" disabled>No users match.</option>
-            ) : (
-              filteredUsers.map((u) => (
-                <option key={u.id} value={u.id}>{u.name} — {u.email}</option>
-              ))
-            )}
-          </select>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Pair</label>
-            <input
-              value={form.pair}
-              onChange={(e) => setForm({ ...form, pair: e.target.value.toUpperCase() })}
-              placeholder="BTC/USD"
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm uppercase"
+        <PaymentSourceSelector
+          value={source}
+          onChange={setSource}
+          label="Funding source"
+          showLiveBalance
+          testId="select-trade-funding-source"
+        />
+        {isExternal && (
+          <>
+            <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Settle in</Label>
+                <select
+                  className="bg-background border border-input rounded px-2 py-1 text-xs"
+                  value={settlementAsset}
+                  onChange={(e) => setSettlementAsset(e.target.value as "USDT" | "USDC" | "DAI")}
+                  data-testid="select-trade-settlement-asset"
+                >
+                  <option value="USDT">USDT</option>
+                  <option value="USDC">USDC</option>
+                  <option value="DAI">DAI</option>
+                </select>
+              </div>
+              <div className="text-muted-foreground">
+                {platform?.address ? (
+                  <>
+                    Broadcasts on-chain to platform address{" "}
+                    <span className="font-mono">{platform.address.slice(0, 8)}…{platform.address.slice(-6)}</span>.
+                  </>
+                ) : (
+                  "Loading platform receiving address…"
+                )}
+              </div>
+            </div>
+            <ManualTxHashInput
+              value={manualTxHash}
+              onChange={setManualTxHash}
+              testId="input-trade-manual-tx-hash"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as "long" | "short" })}
-              className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm"
-            >
-              <option value="long">long</option>
-              <option value="short">short</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label>
-            <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Currency</label>
-            <input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm uppercase" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Entry price</label>
-            <input type="number" value={form.entryPrice} onChange={(e) => setForm({ ...form, entryPrice: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Target price</label>
-            <input type="number" value={form.targetPrice} onChange={(e) => setForm({ ...form, targetPrice: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Current price</label>
-            <input type="number" value={form.currentPrice} onChange={(e) => setForm({ ...form, currentPrice: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Expected profit</label>
-            <input type="number" value={form.expectedProfit} onChange={(e) => setForm({ ...form, expectedProfit: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Initial profit (P/L)</label>
-            <input type="number" value={form.profit} onChange={(e) => setForm({ ...form, profit: e.target.value })} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-          </div>
-        </div>
-        <button
-          onClick={submit}
-          disabled={isPending || !userId || !form.pair || !form.amount || !form.entryPrice}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-60"
+          </>
+        )}
+        <Button
+          className="w-full"
+          onClick={handleAllocate}
+          disabled={inFlight || !source || (isExternal && !manualTxHash.trim() && !platform?.address)}
+          data-testid="button-trade-allocate"
         >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Open Trade
-        </button>
-      </div>
-    </Modal>
+          {inFlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {sendFromWallet.isPending
+            ? "Broadcasting on-chain…"
+            : createDeposit.isPending
+              ? "Allocating…"
+              : isExternal && manualTxHash.trim()
+                ? "Settle with tx hash"
+                : "Allocate"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
-function EditFiguresModal({
-  trade,
-  isPending,
-  onClose,
-  onSubmit,
-}: {
-  trade: AdminTradeRow;
-  isPending: boolean;
-  onClose: () => void;
-  onSubmit: (data: { currentPrice: number; profit: number; expectedProfit: number }) => Promise<void>;
-}) {
-  const [currentPrice, setCurrentPrice] = useState(String(trade.currentPrice));
-  const [profit, setProfit] = useState(String(trade.profit));
-  const [expectedProfit, setExpectedProfit] = useState(String(trade.expectedProfit));
-
-  const submit = async () => {
-    await onSubmit({
-      currentPrice: parseFloat(currentPrice),
-      profit: parseFloat(profit),
-      expectedProfit: parseFloat(expectedProfit),
-    });
-  };
+function TradeItem({ trade, onRelease, isReleasing }: { trade: any, onRelease?: () => void, isReleasing?: boolean }) {
+  const isLong = trade.type === 'long';
+  const isProfitable = trade.profit > 0;
+  const isCompleted = trade.status === 'completed';
 
   return (
-    <Modal title={`Edit P/L — ${trade.pair} (${trade.userName})`} onClose={onClose}>
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Current price</label>
-          <input type="number" value={currentPrice} onChange={(e) => setCurrentPrice(e.target.value)} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg bg-card/50 gap-4">
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-full ${isLong ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'}`}>
+          {isLong ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Profit (current P/L)</label>
-          <input type="number" value={profit} onChange={(e) => setProfit(e.target.value)} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-lg">{trade.pair}</span>
+            <Badge variant="secondary" className="uppercase text-xs">{trade.type}</Badge>
+            {trade.managerId && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Social</Badge>}
+          </div>
+          <div className="text-sm text-muted-foreground mt-1 flex gap-4">
+            <span>Entry: ${trade.entryPrice.toLocaleString()}</span>
+            <span>Current: ${trade.currentPrice.toLocaleString()}</span>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Expected profit at target</label>
-          <input type="number" value={expectedProfit} onChange={(e) => setExpectedProfit(e.target.value)} className="w-full px-3 py-2 bg-input border border-border rounded-md text-sm" />
-        </div>
-        <button
-          onClick={submit}
-          disabled={isPending}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-60"
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Figures
-        </button>
       </div>
-    </Modal>
-  );
-}
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card border border-card-border rounded-xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
+      <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="text-right">
+          <div className="text-xs text-muted-foreground mb-1">P/L</div>
+          <div className={`font-bold text-lg ${isProfitable ? 'text-success' : trade.profit < 0 ? 'text-destructive' : ''}`}>
+            {isProfitable ? '+' : ''}{trade.profit.toLocaleString()} {trade.currency}
+          </div>
         </div>
-        {children}
+
+        {isCompleted && onRelease && (
+          <Button size="sm" onClick={onRelease} disabled={isReleasing}>
+            Release Funds <ArrowRightCircle className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+        {!isCompleted && (
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground mb-1">Target</div>
+            <div className="font-medium">${trade.targetPrice.toLocaleString()}</div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+function UsersIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+

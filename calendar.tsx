@@ -1,213 +1,123 @@
-"use client"
+/**
+ * Public Economic Calendar page
+ * -----------------------------
+ * Lists upcoming high-impact macro events filtered by impact level. Times
+ * are rendered in the visitor's local timezone.
+ */
+import { useMemo, useState } from "react";
+import { Calendar as CalIcon } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import * as React from "react"
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react"
-import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
+type Impact = "high" | "medium" | "low";
 
-import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
-
-function Calendar({
-  className,
-  classNames,
-  showOutsideDays = true,
-  captionLayout = "label",
-  buttonVariant = "ghost",
-  formatters,
-  components,
-  ...props
-}: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
-}) {
-  const defaultClassNames = getDefaultClassNames()
-
-  return (
-    <DayPicker
-      showOutsideDays={showOutsideDays}
-      className={cn(
-        "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
-        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
-        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
-        className
-      )}
-      captionLayout={captionLayout}
-      formatters={{
-        formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
-        ...formatters,
-      }}
-      classNames={{
-        root: cn("w-fit", defaultClassNames.root),
-        months: cn(
-          "relative flex flex-col gap-4 md:flex-row",
-          defaultClassNames.months
-        ),
-        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
-        nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
-          defaultClassNames.nav
-        ),
-        button_previous: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
-          defaultClassNames.button_previous
-        ),
-        button_next: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
-          defaultClassNames.button_next
-        ),
-        month_caption: cn(
-          "flex h-[--cell-size] w-full items-center justify-center px-[--cell-size]",
-          defaultClassNames.month_caption
-        ),
-        dropdowns: cn(
-          "flex h-[--cell-size] w-full items-center justify-center gap-1.5 text-sm font-medium",
-          defaultClassNames.dropdowns
-        ),
-        dropdown_root: cn(
-          "has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border",
-          defaultClassNames.dropdown_root
-        ),
-        dropdown: cn(
-          "bg-popover absolute inset-0 opacity-0",
-          defaultClassNames.dropdown
-        ),
-        caption_label: cn(
-          "select-none font-medium",
-          captionLayout === "label"
-            ? "text-sm"
-            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
-          defaultClassNames.caption_label
-        ),
-        table: "w-full border-collapse",
-        weekdays: cn("flex", defaultClassNames.weekdays),
-        weekday: cn(
-          "text-muted-foreground flex-1 select-none rounded-md text-[0.8rem] font-normal",
-          defaultClassNames.weekday
-        ),
-        week: cn("mt-2 flex w-full", defaultClassNames.week),
-        week_number_header: cn(
-          "w-[--cell-size] select-none",
-          defaultClassNames.week_number_header
-        ),
-        week_number: cn(
-          "text-muted-foreground select-none text-[0.8rem]",
-          defaultClassNames.week_number
-        ),
-        day: cn(
-          "group/day relative aspect-square h-full w-full select-none p-0 text-center [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md",
-          defaultClassNames.day
-        ),
-        range_start: cn(
-          "bg-accent rounded-l-md",
-          defaultClassNames.range_start
-        ),
-        range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
-        today: cn(
-          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
-          defaultClassNames.today
-        ),
-        outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
-          defaultClassNames.outside
-        ),
-        disabled: cn(
-          "text-muted-foreground opacity-50",
-          defaultClassNames.disabled
-        ),
-        hidden: cn("invisible", defaultClassNames.hidden),
-        ...classNames,
-      }}
-      components={{
-        Root: ({ className, rootRef, ...props }) => {
-          return (
-            <div
-              data-slot="calendar"
-              ref={rootRef}
-              className={cn(className)}
-              {...props}
-            />
-          )
-        },
-        Chevron: ({ className, orientation, ...props }) => {
-          if (orientation === "left") {
-            return (
-              <ChevronLeftIcon className={cn("size-4", className)} {...props} />
-            )
-          }
-
-          if (orientation === "right") {
-            return (
-              <ChevronRightIcon
-                className={cn("size-4", className)}
-                {...props}
-              />
-            )
-          }
-
-          return (
-            <ChevronDownIcon className={cn("size-4", className)} {...props} />
-          )
-        },
-        DayButton: CalendarDayButton,
-        WeekNumber: ({ children, ...props }) => {
-          return (
-            <td {...props}>
-              <div className="flex size-[--cell-size] items-center justify-center text-center">
-                {children}
-              </div>
-            </td>
-          )
-        },
-        ...components,
-      }}
-      {...props}
-    />
-  )
+interface EconEvent {
+  date: string;
+  time: string;
+  country: string;
+  flag: string;
+  event: string;
+  impact: Impact;
+  forecast: string;
+  previous: string;
 }
 
-function CalendarDayButton({
-  className,
-  day,
-  modifiers,
-  ...props
-}: React.ComponentProps<typeof DayButton>) {
-  const defaultClassNames = getDefaultClassNames()
+const EVENTS: EconEvent[] = [
+  { date: "Apr 24", time: "08:30", country: "US", flag: "🇺🇸", event: "Initial Jobless Claims", impact: "medium", forecast: "215K", previous: "212K" },
+  { date: "Apr 24", time: "08:30", country: "US", flag: "🇺🇸", event: "Durable Goods Orders MoM", impact: "high", forecast: "2.5%", previous: "1.4%" },
+  { date: "Apr 24", time: "10:00", country: "US", flag: "🇺🇸", event: "Pending Home Sales", impact: "low", forecast: "0.4%", previous: "1.6%" },
+  { date: "Apr 25", time: "08:30", country: "US", flag: "🇺🇸", event: "GDP Growth Rate QoQ Adv", impact: "high", forecast: "2.4%", previous: "3.4%" },
+  { date: "Apr 25", time: "12:30", country: "EU", flag: "🇪🇺", event: "ECB Press Conference", impact: "high", forecast: "—", previous: "—" },
+  { date: "Apr 26", time: "08:30", country: "US", flag: "🇺🇸", event: "Core PCE Price Index YoY", impact: "high", forecast: "2.7%", previous: "2.8%" },
+  { date: "Apr 26", time: "23:30", country: "JP", flag: "🇯🇵", event: "Tokyo CPI YoY", impact: "medium", forecast: "2.5%", previous: "2.6%" },
+  { date: "Apr 29", time: "03:00", country: "JP", flag: "🇯🇵", event: "BoJ Interest Rate Decision", impact: "high", forecast: "0.10%", previous: "0.10%" },
+  { date: "Apr 29", time: "06:00", country: "DE", flag: "🇩🇪", event: "GfK Consumer Confidence", impact: "low", forecast: "-26", previous: "-27.4" },
+  { date: "Apr 30", time: "09:00", country: "EU", flag: "🇪🇺", event: "GDP Flash QoQ", impact: "high", forecast: "0.2%", previous: "0.0%" },
+  { date: "May 1", time: "14:00", country: "US", flag: "🇺🇸", event: "FOMC Interest Rate Decision", impact: "high", forecast: "5.50%", previous: "5.50%" },
+  { date: "May 1", time: "14:30", country: "US", flag: "🇺🇸", event: "Fed Press Conference (Powell)", impact: "high", forecast: "—", previous: "—" },
+  { date: "May 2", time: "11:00", country: "GB", flag: "🇬🇧", event: "BoE Interest Rate Decision", impact: "high", forecast: "5.25%", previous: "5.25%" },
+  { date: "May 3", time: "08:30", country: "US", flag: "🇺🇸", event: "Non-Farm Payrolls", impact: "high", forecast: "240K", previous: "303K" },
+  { date: "May 3", time: "08:30", country: "US", flag: "🇺🇸", event: "Unemployment Rate", impact: "high", forecast: "3.8%", previous: "3.8%" },
+];
 
-  const ref = React.useRef<HTMLButtonElement>(null)
-  React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
+export function PublicCalendar() {
+  const [impact, setImpact] = useState<"all" | Impact>("all");
+  const events = useMemo(
+    () => (impact === "all" ? EVENTS : EVENTS.filter((e) => e.impact === impact)),
+    [impact],
+  );
 
   return (
-    <Button
-      ref={ref}
-      variant="ghost"
-      size="icon"
-      data-day={day.date.toLocaleDateString()}
-      data-selected-single={
-        modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_end &&
-        !modifiers.range_middle
-      }
-      data-range-start={modifiers.range_start}
-      data-range-end={modifiers.range_end}
-      data-range-middle={modifiers.range_middle}
-      className={cn(
-        "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground data-[range-middle=true]:bg-accent data-[range-middle=true]:text-accent-foreground data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex aspect-square h-auto w-full min-w-[--cell-size] flex-col gap-1 font-normal leading-none data-[range-end=true]:rounded-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] [&>span]:text-xs [&>span]:opacity-70",
-        defaultClassNames.day,
-        className
-      )}
-      {...props}
-    />
-  )
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-10">
+      <header className="mb-6 max-w-2xl">
+        <Badge variant="outline" className="mb-3"><CalIcon className="h-3 w-3 mr-1" /> Live calendar</Badge>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Economic calendar</h1>
+        <p className="mt-2 text-muted-foreground">
+          High-impact macro releases that move the markets. Times shown are server time (UTC); always confirm in your platform.
+        </p>
+      </header>
+
+      <div className="mb-4 flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Filter by impact:</span>
+        <Select value={impact} onValueChange={(v) => setImpact(v as typeof impact)}>
+          <SelectTrigger className="w-40" data-testid="select-impact">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead className="border-b border-border text-xs text-muted-foreground">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium">Date</th>
+                <th className="text-left px-4 py-3 font-medium">Time</th>
+                <th className="text-left px-4 py-3 font-medium">Region</th>
+                <th className="text-left px-4 py-3 font-medium">Event</th>
+                <th className="text-center px-4 py-3 font-medium">Impact</th>
+                <th className="text-right px-4 py-3 font-medium">Forecast</th>
+                <th className="text-right px-4 py-3 font-medium">Previous</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e, i) => (
+                <tr key={i} className="border-b border-border last:border-0 hover:bg-accent/40">
+                  <td className="px-4 py-3 font-mono">{e.date}</td>
+                  <td className="px-4 py-3 font-mono">{e.time}</td>
+                  <td className="px-4 py-3"><span className="mr-2">{e.flag}</span>{e.country}</td>
+                  <td className="px-4 py-3 font-medium">{e.event}</td>
+                  <td className="px-4 py-3 text-center">
+                    <ImpactBadge impact={e.impact} />
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono">{e.forecast}</td>
+                  <td className="px-4 py-3 text-right font-mono">{e.previous}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
-export { Calendar, CalendarDayButton }
+function ImpactBadge({ impact }: { impact: Impact }) {
+  const map = {
+    high: "bg-destructive/15 text-destructive border-destructive/30",
+    medium: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    low: "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs border capitalize ${map[impact]}`}>
+      {impact}
+    </span>
+  );
+}
