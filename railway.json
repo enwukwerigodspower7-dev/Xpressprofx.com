@@ -1,7 +1,8 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "buildCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install --no-frozen-lockfile && node build.js"
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install -g pnpm && pnpm install && node build.js"
   },
   "deploy": {
     "startCommand": "node artifacts/api-server/dist/index.mjs",
