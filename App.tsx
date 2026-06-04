@@ -1,185 +1,146 @@
-import { useState } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import { LoginPage } from "@/pages/login";
-import { DashboardPage } from "@/pages/dashboard";
-import { UsersPage } from "@/pages/users";
-import { UserDetailPage } from "@/pages/user-detail";
-import { GasFeePage } from "@/pages/gas-fee";
-import { LiveChatPage } from "@/pages/live-chat";
-import { MailboxPage } from "@/pages/mailbox";
-import { BillingPage } from "@/pages/billing-admin";
-import { PlatformSettingsPage } from "@/pages/platform-settings";
-import { AssetsPage } from "@/pages/assets";
-import { TradesPage } from "@/pages/trades";
-import { P2PMerchantsPage } from "@/pages/p2p-merchants";
-import { AdminNotificationsPage } from "@/pages/admin-notifications";
-import {
-  DesktopSidebar,
-  MobileSidebar,
-  TopAppBar,
-  getActivePage,
-} from "@/components/sidebar";
-import { useGetCurrentUser } from "@workspace/api-client-react";
+import { useEffect, useState, type ComponentType } from "react";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
-  },
-});
+import { modules as discoveredModules } from "./.generated/mockup-components";
 
-function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [location] = useLocation();
-  const active = getActivePage(location);
+type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
+function _resolveComponent(
+  mod: Record<string, unknown>,
+  name: string,
+): ComponentType | undefined {
+  const fns = Object.values(mod).filter(
+    (v) => typeof v === "function",
+  ) as ComponentType[];
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <DesktopSidebar />
-      <MobileSidebar open={open} onOpenChange={setOpen} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <TopAppBar title={active.label} onMenu={() => setOpen(true)} />
-        <main className="flex-1 overflow-auto">{children}</main>
+    (mod.default as ComponentType) ||
+    (mod.Preview as ComponentType) ||
+    (mod[name] as ComponentType) ||
+    fns[fns.length - 1]
+  );
+}
+
+function PreviewRenderer({
+  componentPath,
+  modules,
+}: {
+  componentPath: string;
+  modules: ModuleMap;
+}) {
+  const [Component, setComponent] = useState<ComponentType | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setComponent(null);
+    setError(null);
+
+    async function loadComponent(): Promise<void> {
+      const key = `./components/mockups/${componentPath}.tsx`;
+      const loader = modules[key];
+      if (!loader) {
+        setError(`No component found at ${componentPath}.tsx`);
+        return;
+      }
+
+      try {
+        const mod = await loader();
+        if (cancelled) {
+          return;
+        }
+        const name = componentPath.split("/").pop()!;
+        const comp = _resolveComponent(mod, name);
+        if (!comp) {
+          setError(
+            `No exported React component found in ${componentPath}.tsx\n\nMake sure the file has at least one exported function component.`,
+          );
+          return;
+        }
+        setComponent(() => comp);
+      } catch (e) {
+        if (cancelled) {
+          return;
+        }
+
+        const message = e instanceof Error ? e.message : String(e);
+        setError(`Failed to load preview.\n${message}`);
+      }
+    }
+
+    void loadComponent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [componentPath, modules]);
+
+  if (error) {
+    return (
+      <pre style={{ color: "red", padding: "2rem", fontFamily: "system-ui" }}>
+        {error}
+      </pre>
+    );
+  }
+
+  if (!Component) return null;
+
+  return <Component />;
+}
+
+function getBasePath(): string {
+  return import.meta.env.BASE_URL.replace(/\/$/, "");
+}
+
+function getPreviewExamplePath(): string {
+  const basePath = getBasePath();
+  return `${basePath}/preview/ComponentName`;
+}
+
+function Gallery() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+      <div className="text-center max-w-md">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-3">
+          Component Preview Server
+        </h1>
+        <p className="text-gray-500 mb-4">
+          This server renders individual components for the workspace canvas.
+        </p>
+        <p className="text-sm text-gray-400">
+          Access component previews at{" "}
+          <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+            {getPreviewExamplePath()}
+          </code>
+        </p>
       </div>
     </div>
   );
 }
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading, isError } = useGetCurrentUser();
-  const [, navigate] = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground text-sm">Loading...</div>
-      </div>
-    );
-  }
-
-  if (isError || !user) {
-    navigate("/login");
-    return null;
-  }
-
-  return <>{children}</>;
-}
-
-function Protected({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthGuard>
-      <AdminLayout>{children}</AdminLayout>
-    </AuthGuard>
-  );
-}
-
-function Router() {
-  return (
-    <Switch>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/">
-        {() => (
-          <Protected>
-            <DashboardPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/users">
-        {() => (
-          <Protected>
-            <UsersPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/users/:userId">
-        {(params) => (
-          <Protected>
-            <UserDetailPage userId={params.userId} />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/gas-fee">
-        {() => (
-          <Protected>
-            <GasFeePage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/live-chat">
-        {() => (
-          <Protected>
-            <LiveChatPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/mailbox">
-        {() => (
-          <Protected>
-            <MailboxPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/billing">
-        {() => (
-          <Protected>
-            <BillingPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/platform-settings">
-        {() => (
-          <Protected>
-            <PlatformSettingsPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/assets">
-        {() => (
-          <Protected>
-            <AssetsPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/trades">
-        {() => (
-          <Protected>
-            <TradesPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/p2p-merchants">
-        {() => (
-          <Protected>
-            <P2PMerchantsPage />
-          </Protected>
-        )}
-      </Route>
-      <Route path="/notifications">
-        {() => (
-          <Protected>
-            <AdminNotificationsPage />
-          </Protected>
-        )}
-      </Route>
-      <Route component={NotFound} />
-    </Switch>
-  );
+function getPreviewPath(): string | null {
+  const basePath = getBasePath();
+  const { pathname } = window.location;
+  const local =
+    basePath && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length) || "/"
+      : pathname;
+  const match = local.match(/^\/preview\/(.+)$/);
+  return match ? match[1] : null;
 }
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
+  const previewPath = getPreviewPath();
+
+  if (previewPath) {
+    return (
+      <PreviewRenderer
+        componentPath={previewPath}
+        modules={discoveredModules}
+      />
+    );
+  }
+
+  return <Gallery />;
 }
 
 export default App;
