@@ -1,1 +1,3 @@
-web: node artifacts/api-server/dist/index.mjs
+git mv Procfile Procfile.backup
+git commit -m "disable Procfile for Railway build"
+git push
